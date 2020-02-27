@@ -16,6 +16,7 @@ script:
 
 after_script:
   - cd ./public
+  - echo "blog.linote.cn" > CNAME
   - git config user.name "Su Yanjun"   #修改成自己的github用户名
   - git config user.email "suyanjun218@163.com"   #修改成自己的GitHub邮箱
   - git add .
