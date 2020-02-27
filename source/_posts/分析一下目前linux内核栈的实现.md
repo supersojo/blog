@@ -49,6 +49,7 @@ root@ubuntu:/share/linux# find . -name Kconfig | xargs grep -rsn VMAP_STACK
 >          To use this with KASAN, the architecture must support backing
 >          virtual mappings with real shadow memory, and KASAN_VMALLOC must
 >           be enabled.
+
 如果内核开启CONFIG_VMAP_STACK，内核可以快速检测内核栈overflow异常，比之前在内核栈溢出
 访问时出问题难以诊断，内核栈溢出肯定访问垃圾数据，其结果不可预测的，难以排查，在有个guardpage后
 只要内核栈溢出访问，内核可以快速捕获到。
@@ -163,6 +164,104 @@ KASAN扩展阅读
 2. [KASAN简单介绍](https://www.ibm.com/developerworks/cn/linux/1608_tengr_kasan/index.html)
 
 ### 内核栈的布局
+内核栈布局和架构相关，x86配置如下
+```
+$ cat arch/x86/Kconfig
+config X86
+        def_bool y
+		...
+		select THREAD_INFO_IN_TASK
+		...
 
+$ cat include/linux/sched.h
+struct task_struct {
+#ifdef CONFIG_THREAD_INFO_IN_TASK
+        /*
+         * For reasons of header soup (see current_thread_info()), this
+         * must be the first element of task_struct.
+         */
+        struct thread_info              thread_info;
+#endif
+
+```
+由上可见在x86上，内核栈就是单纯的内核栈，thread_info结构不在内核栈的低端地址上，而是移到了task_struct结构中，这样好处是
+内核栈溢出时不会破坏thread_info结构，更加安全。
+
+之前内核栈的布局是这样的，如下所示：
+```
+high address                low address 
+|----------------------|<-------->|
+                        thread_info
+```
 
 ## scatterlist
+scatterlist用来描述一内存段，其结构如下：
+```
+struct scatterlist {
+        unsigned long   page_link;
+        unsigned int    offset;
+        unsigned int    length;
+        dma_addr_t      dma_address;
+#ifdef CONFIG_NEED_SG_DMA_LENGTH
+        unsigned int    dma_length;
+#endif
+};
+```
+page_link是page指针，这里复用该page指针使其支持[scatterlist chain](https://lwn.net/Articles/234617/)。
+每个scatterlist描述一个物理页的内存片段。
+
+为何vmalloc空间不能用于scatterlist呢？
+```
+          vmalloc buffer
+           |-------------|
+	|-------------|-----------|
+         pageX	       pageY
+```
+如果vmalloc buffer跨page边界，看会发生什么。
+```
+$ cat net/sunrpc/auth_gss/gss_krb5_crypto.c
+u32
+krb5_encrypt(
+        struct crypto_sync_skcipher *tfm,
+        void * iv,
+        void * in,
+        void * out,
+        int length)
+{
+        u32 ret = -EINVAL;
+        struct scatterlist sg[1];
+		...
+		memcpy(out, in, length);
+        sg_init_one(sg, out, length);
+		...
+}
+$ cat lib/scatterlist.c
+void sg_init_one(struct scatterlist *sg, const void *buf, unsigned int buflen)
+{
+        sg_init_table(sg, 1);
+        sg_set_buf(sg, buf, buflen);
+}
+$ cat include/linux/scatterlist.h
+static inline void sg_set_buf(struct scatterlist *sg, const void *buf,
+			      unsigned int buflen)
+{
+#ifdef CONFIG_DEBUG_SG
+	BUG_ON(!virt_addr_valid(buf));
+#endif
+	sg_set_page(sg, virt_to_page(buf), buflen, offset_in_page(buf));
+}
+$ cat include/linux/scatterlist.h
+static inline void sg_set_page(struct scatterlist *sg, struct page *page,
+			       unsigned int len, unsigned int offset)
+{
+	sg_assign_page(sg, page);
+	sg->offset = offset;
+	sg->length = len;
+}
+```
+在sg_set_page后，scatterlist只记录了pageX，后面的pageY是没有记录的，后面使用scatterlist时
+可能访问到垃圾数据。可见vmalloc空间时不能用于scatterlist的。
+
+## 总结
+本文分析了CONFIG_VMAP_STACK和scatterlist的功能，在使能CONFIG_VMAP_STACK后，内核栈上分配的
+空间是物理上不连续的，不能用于scatterlist，不能用于DMA。
