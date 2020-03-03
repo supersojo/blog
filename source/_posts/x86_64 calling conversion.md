@@ -51,7 +51,7 @@ foo:
      push %rbp
      mov %rsp,%rbp
      sub $16,%rsp # local var spaces
-     …
+     ...
      add $16,%rsp # balance stack
      pop %rbp  # restore stack frame pointer
      ret # return to caller
@@ -60,7 +60,7 @@ foo:
                   |           |
                  rbp         rsp
  -8(%rbp):local vars
-``` 
+```
 
 在使用完局部变量需要把对应栈空间释放，平衡堆栈，最后ret返回caller处。
 
