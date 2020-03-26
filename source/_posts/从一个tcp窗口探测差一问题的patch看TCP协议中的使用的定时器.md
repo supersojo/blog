@@ -72,20 +72,7 @@ struct inet_connection_sock {
 sk_timer作为keepalive timer使用，在socket设置SOCK_KEEPOPEN时才启用。
 
 keepalive timer流程如下:
-
-```
-server               client
-            ->syn   \
-			<-synack| 3 handshakes
-			->ack   /
-			
-			2 hours (keepalive timer timeout)
-			-->probe \
-			         |=> 9 times (9*75s) 
-			-->probe /
-			
-			terminate
-```			
+![keepalive机制](从一个tcp窗口探测差一问题的patch看TCP协议中的使用的定时器/keepalive.png)
 
 linux内核对keepalive的处理代码如下:
 
@@ -181,33 +168,12 @@ net.ipv4.tcp_retries2 = 15
 ```
 内核设置重传次数和zero-window-size次数限制为上面的值。
 
-```
-server               client
-            ->syn
-			<-synack
-			->ack
-			...
-			<--zero window ack
-			
-			-->probe \
-			...       |=> 15 times (15* [rto])
-			-->probe /
-```
+![zero-window-size机制](从一个tcp窗口探测差一问题的patch看TCP协议中的使用的定时器/zero-window-size.png)
 
-```		
-server               client
-            ->syn
-			<-synack
-			->ack
-			...
-            -->data (not acked by receiver)
-            -->probe \
-			...      |=> 15 times (15* [rto])
-			-->probe /
-```
+![retransmit机制](从一个tcp窗口探测差一问题的patch看TCP协议中的使用的定时器/retransmit.png)
 
 ### icsk_delack_timer
-待
+待更新
 
 ## 参考
 1. [tcp协议中的timer](https://www.gatevidyalay.com/tcp-timers-transmission-control-protocol/)
