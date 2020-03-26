@@ -1,3 +1,15 @@
+---
+title: 从一个tcp窗口探测差一问题的patch看TCP协议中的使用的定时器
+date: 2020-03-10 20:18:10
+tags:
+- tcp
+- timer
+- keepalive
+- zero-window-size
+categories:
+- network
+- kernel
+---
 ## 从一个tcp窗口探测差一问题的patch看TCP协议中的使用的定时器
 
 这个[patch](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/net/ipv4/tcp_timer.c?id=3976535af0cb9fe34a55f2ffb8d7e6b39a2f8188)的描述如下:
@@ -10,6 +22,7 @@
 
 ## TCP协议中的timer 
 ![TCP协议中的定时器](从一个tcp窗口探测差一问题的patch看TCP协议中的使用的定时器/TCP-Timers-1.png)
+
 协议中主要有4个定时器，注意这里每个TCP连接都有4个定时器。
 
 1. Time Out Timer
@@ -59,64 +72,68 @@ struct inet_connection_sock {
 sk_timer作为keepalive timer使用，在socket设置SOCK_KEEPOPEN时才启用。
 
 keepalive timer流程如下:
+
 ```
 server               client
             ->syn   \
 			<-synack| 3 handshakes
 			->ack   /
-			...
+			
 			2 hours (keepalive timer timeout)
 			-->probe \
-			...       |=> 9 times (9*75s) 
+			         |=> 9 times (9*75s) 
 			-->probe /
 			
 			terminate
 ```			
 
-linux内核对keepalive的处理代码如下：
+linux内核对keepalive的处理代码如下:
+
 ```
 static void tcp_keepalive_timer (struct timer_list *t)
-...
-if (elapsed >= keepalive_time_when(tp)) { // 7200s
-		/* If the TCP_USER_TIMEOUT option is enabled, use that
-		 * to determine when to timeout instead.
-		 */
-		if ((icsk->icsk_user_timeout != 0 &&
-			elapsed >= msecs_to_jiffies(icsk->icsk_user_timeout) &&
-			icsk->icsk_probes_out > 0) ||
-			(icsk->icsk_user_timeout == 0 &&
-			icsk->icsk_probes_out >= keepalive_probes(tp))) { //到达次数限制9
-				tcp_send_active_reset(sk, GFP_ATOMIC);
-				tcp_write_err(sk);
-				goto out;
-		}
-		if (tcp_write_wakeup(sk, LINUX_MIB_TCPKEEPALIVE) <= 0) { //发送probe报文
-				icsk->icsk_probes_out++;
-				elapsed = keepalive_intvl_when(tp);// 75s
-		} else {
-				/* If keepalive was lost due to local congestion,
-				 * try harder.
-				 */
-				elapsed = TCP_RESOURCE_PROBE_INTERVAL;
-		}
-} else {
-		/* It is tp->rcv_tstamp + keepalive_time_when(tp) */
-		elapsed = keepalive_time_when(tp) - elapsed;
-}
-...
+	...
+	if (elapsed >= keepalive_time_when(tp)) { // 7200s
+			/* If the TCP_USER_TIMEOUT option is enabled, use that
+			 * to determine when to timeout instead.
+			 */
+			if ((icsk->icsk_user_timeout != 0 &&
+				elapsed >= msecs_to_jiffies(icsk->icsk_user_timeout) &&
+				icsk->icsk_probes_out > 0) ||
+				(icsk->icsk_user_timeout == 0 &&
+				icsk->icsk_probes_out >= keepalive_probes(tp))) { //到达次数限制9
+					tcp_send_active_reset(sk, GFP_ATOMIC);
+					tcp_write_err(sk);
+					goto out;
+			}
+			if (tcp_write_wakeup(sk, LINUX_MIB_TCPKEEPALIVE) <= 0) { //发送probe报文
+					icsk->icsk_probes_out++;
+					elapsed = keepalive_intvl_when(tp);// 75s
+			} else {
+					/* If keepalive was lost due to local congestion,
+					 * try harder.
+					 */
+					elapsed = TCP_RESOURCE_PROBE_INTERVAL;
+			}
+	} else {
+			/* It is tp->rcv_tstamp + keepalive_time_when(tp) */
+			elapsed = keepalive_time_when(tp) - elapsed;
+	}
+	...
 ```
+
 在上面代码中使用**icsk_probes_out**对probe次数进行统计。keepalive_probes缺省设置为9。
 
 ```
 net.ipv4.tcp_keepalive_probes = 9
 ```
+
 使用上面的内核选项可以设置该值。
 
 tcp_write_wakeup负责发出probe报文，这个函数首先判断socket发送队列是否
 有报文等待发送，如果有则发送sk->sk_send_head报文(注意这个指针总是指向下一个要
 发送的报文)；如果发送队列空则发送probe报文(注意这个报文的序列号为out of date即无效)。
 
-如果报文能够到达接收测，则接收测回复ack消息。下面是收到ack报文的处理流程
+如果报文能够到达接收测，则接收测回复ack消息。下面是收到ack报文的处理流程:
 ```
 static void tcp_ack_probe(struct sock *sk)
 {
@@ -141,6 +158,7 @@ static void tcp_ack_probe(struct sock *sk)
         }
 }
 ```
+
 如果接收测返回报文通知窗口大小为0则继续窗口探测过程，由于有接收到报文，
 这时keepalive超时时判断距离上次报文时间不会超过7200s，这样keepalive定时器
 重置为7200s超时。
@@ -157,6 +175,7 @@ keepalive定时器超时了3次后，才从接收测收到ack消息，这时开�
 
 即重传定时器，对应协议中的Time Out Timer和Persistent Timer。
 内核使用一个定时器处理重传定时器和zero-window-size的探测定时器使用。	
+
 ```
 net.ipv4.tcp_retries2 = 15
 ```
