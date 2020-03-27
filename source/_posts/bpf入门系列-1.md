@@ -1,3 +1,11 @@
+---
+title: bpf入门系列-1
+date: 2020-02-13 21:21:10
+tags:
+- bpf
+categories:
+- kernel
+---
 ## bpf的build环境
 
 简单讲，bpf是内核内置的虚拟机，对bpf的支持，内核需要开启编译选项如下
