@@ -19,9 +19,11 @@ after_script:
   - echo "blog.linote.cn" > CNAME
   - git config user.name "Su Yanjun"   #修改成自己的github用户名
   - git config user.email "suyanjun218@163.com"   #修改成自己的GitHub邮箱
+  - git status
   - git add .
+  - git status
   - git commit -m "Travis CI Auto Builder ${TRAVIS_BUILD_NUMBER}"
-  - git push --force --quiet  "https://${GH_TOKEN}@${GH_REF}" master:master #GH_token就是在travis中设置的token
+  - git push --force  "https://${GH_TOKEN}@${GH_REF}" master:master #GH_token就是在travis中设置的token
 
 branches:
   only:
