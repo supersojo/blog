@@ -1,3 +1,12 @@
+---
+title: bpf入门系列-2
+date: 2020-02-17 21:21:10
+tags:
+- bpf
+categories:
+- kernel
+---
+
 ## 头文件设置
 
 要想能够成功编译bpf程序，需要正确的设置头文件，在linux内核版本3.7之后引入了uapi，下面是uapi的简单介绍。
