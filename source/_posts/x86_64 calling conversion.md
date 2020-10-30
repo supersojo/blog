@@ -93,6 +93,13 @@ call conventions:
 
 前6个参数使用寄存器传递，如果还有额外参数则通过堆栈传递。
 
+以上式x86的调用约定，更正下x64的调用约定。
+
+x64调用约定进行函数调用时栈必须是16字节对齐的，有人做过实验，只有macOS严格执行，
+linux和windows似乎不严格执行该规定，即使不16字节对齐也没多大问题。
+
+在windows上，x64调用约定使用rcx,rdx,r8,r9传参，但是需要在栈上给它们留空间，windows还有还有SEH结构化异常处理。
+
 ## 参考资料
 
 1. [X86_calling_conventions](https://en.wikipedia.org/wiki/X86_calling_conventions)
