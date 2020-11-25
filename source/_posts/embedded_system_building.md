@@ -1387,11 +1387,11 @@ make menuconfig
 make
 ```
 
-![buildroot-main](/home/su/Pictures/buildroot-main.png)
+![buildroot-main](embedded_system_building/buildroot-main.png)
 
-![buildroot-target-settings](/home/su/Pictures/buildroot-target-settings.png)
+![buildroot-target-settings](embedded_system_building/buildroot-target-settings.png)
 
-![buildroot-toolchain-settings](/home/su/Pictures/buildroot-toolchain-settings.png)
+![buildroot-toolchain-settings](embedded_system_building/buildroot-toolchain-settings.png)
 
 we can set linux kernel headers which the toolchain may use and which lib we use (glibc, uclibc, musl).
 
