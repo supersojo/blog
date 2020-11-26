@@ -2,12 +2,12 @@
 title: embedded system building
 date: 2020-11-21 21:01:20
 tags:
-- uboot, uclibc, gcc
+- uboot
+- uclibc
+- gcc
 categories:
 - linux
 ---
-
-[TOC]
 
 ## Preparation
 
