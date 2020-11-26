@@ -1554,4 +1554,6 @@ Detail info please refer to [here](https://gcc.gnu.org/onlinedocs/gccint/Libgcc.
 **libatomic - The GNU Atomic library** which is a GCC support runtime library for atomic operations not supported by hardware.
 
 
-
+## References
+1. [understanding-how-bootloader-works-by-creating-your-own-firmware](https://cjhackerz.net/posts/understanding-how-bootloader-works-by-creating-your-own-firmware/)
+2. [arm-emulated-environment-iotsec-qemu](https://cjhackerz.net/posts/arm-emulated-environment-iotsec-qemu/)
