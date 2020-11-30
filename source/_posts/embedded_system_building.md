@@ -450,6 +450,8 @@ If we want to use arm-linux-gnueabi toolchain, the size of libraries is aboud 16
 
 ### Making rootfs
 
+#### ext3
+
 ```shell
 #!/bin/bash
 
@@ -460,7 +462,6 @@ sudo rm -rf rootfs
 sudo rm -rf ${tmpfs}
 sudo rm -f a9rootfs.ext3
 
-qemu-system-arm -M vexpress-a9 -m 512M -nographic -kernel zImage -dtb vexpress-v2p-ca9.dtb
 sudo mkdir rootfs
 sudo cp _install/* rootfs/ -raf
 
@@ -486,6 +487,40 @@ sudo chmod 777 ${tmpfs}
 sudo mount -t ext3 a9rootfs.ext3 ${tmpfs}/ -o loop
 sudo cp -r rootfs/* ${tmpfs}/
 sudo umount ${tmpfs}
+```
+
+#### jffs2
+
+```shell
+#!/bin/bash
+
+base=`pwd`
+
+sudo rm -rf rootfs
+sudo rm -f a9rootfs.jffs2
+
+
+sudo mkdir rootfs
+sudo cp _install/* rootfs/ -raf
+
+cd rootfs && sudo mkdir -p lib proc sys tmp root var mnt && cd ${base}
+
+# add shared runtime libraries from arm-linux-gnueabi (glibc 2.31)
+sudo cp /usr/arm-linux-gnueabi/lib/*.so.* rootfs/lib -arf
+
+sudo cp examples/bootfloppy/etc rootfs/ -arf
+sudo sed -r "/askfirst/ s/.*/::respawn:-\/bin\/sh/" rootfs/etc/inittab -i
+sudo mkdir -p rootfs/dev/
+sudo mknod rootfs/dev/tty1 c 4 1
+sudo mknod rootfs/dev/tty2 c 4 2
+sudo mknod rootfs/dev/tty3 c 4 3
+sudo mknod rootfs/dev/tty4 c 4 4
+sudo mknod rootfs/dev/console c 5 1
+sudo mknod rootfs/dev/null c 1 3
+
+# 56M, no cleanmarker
+sudo mkfs.jffs2 -r ./rootfs -o a9rootfs.jffs2 -pad 0x3800000 -n
+
 ```
 
 ## initrd
@@ -717,6 +752,58 @@ sudo qemu-system-arm -M vexpress-a9 -m 512M -kernel vexpress_a9/arch/arm/boot/zI
 Running example:
 
 ![kernel-sd-rootfs](embedded_system_building/kernel-sd-rootfs.gif)
+
+## Making firmware
+
+Now we've building u-boot, kernel, dtb, rootfs. It's time for us to custom our firmware.
+
+Defining default u-boot arguments
+
+```c
+#define CONFIG_EXTR_ENV_SETTINGS \
+     CONFIG_PLATFORM_ENV_SETTINGS \
+     BOOTENV \
+     "console=ttyAMA0,38400n8\0" \
+     "root=/dev/mtdblock2\0" \
+     "rootfstype=jffs2\0" \
+     "flashargs=setenv bootargs root=${root} rw rootfstype=${rootfstype} console=${console}\0" \
+     "bootflash=run flashargs; " \
+     	"cp 40000000 60003000 500000; " \
+     	"cp 40700000 61000000 100000; " \
+     	"bootm 60003000 - 61000000\0" \
+     	"fdtfile=" CONFIG_DEFAULT_FDT_FILE "\0"
+     
+```
+
+Generating firmware
+
+```shell
+#!/bin/bash
+# create nor flash image
+dd if=/dev/zero if=firmware.bin bs=1M count=64
+
+# kernel 0-7M
+dd if=vexpress-a9/arch/arm/boot/uImage of=firmware.bin bs=1M seek=0 conv=notrunc
+
+# kernel 7-8M
+dd if=vexpress-a9/arch/arm/boot/dts/vexpress-v2p-ca.dtb of=firmware.bin bs=1M seek=7 conv=notrunc
+
+# rootfs 8-64M
+dd if=a9rootfs.jffs2 of=firmware.bin bs=1M seek=8 conv=notrunc
+
+sync
+echo "firmware is ok!"
+```
+
+Running firmware
+
+```shell
+qemu-system-arm -M vexpress-a9 -nographic -m 512M -kernel u-boot -pflash ../firmware.bin
+```
+
+![u-boo-kernel-jffs2](embedded_system_building/u-boo-kernel-jffs2.gif)
+
+
 
 ## References
 
