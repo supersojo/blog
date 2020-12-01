@@ -805,6 +805,39 @@ qemu-system-arm -M vexpress-a9 -nographic -m 512M -kernel u-boot -pflash ../firm
 
 
 
+## Using uftp
+
+```shell
+qemu-system-arm -M vexpress-a9 -nographic -m 512M -kernel u-boot -pflash ../firmware.bin -net nic,model=lan9118 -net tap,ifname=tap0
+```
+
+> "-net nic,model=lan9118 -net tap,ifname=tap0" for qemu. It'll use tap0 as it's simulated nic.
+
+```shell
+# create tap0
+sudo tunctl -u $(whoami) -t tap0
+# create br0
+sudo brctl addbr br0
+# add tap0 to br0
+sudo brctl addif br0 tap0
+# bring up br0
+sudo ifconfig br0 up
+# bring up tap0
+sudo ifconfig tap0 up
+# setting ip of br0
+sudo ifconfig br0 192.168.100.1/24
+```
+
+![u-boot-with-nic-0](embedded_system_building/u-boot-with-nic-0.png)
+
+![u-boot-ip-settings](embedded_system_building/u-boot-ip-settings.png)
+
+![u-boot-tftp-files](embedded_system_building/u-boot-tftp-files.png)
+
+![u-boot-set-bootargs](embedded_system_building/u-boot-set-bootargs.png)
+
+So we can update kernel or rootfs by network now!
+
 ## References
 
 1. [understanding-how-bootloader-works-by-creating-your-own-firmware](https://cjhackerz.net/posts/understanding-how-bootloader-works-by-creating-your-own-firmware/)
