@@ -805,7 +805,7 @@ qemu-system-arm -M vexpress-a9 -nographic -m 512M -kernel u-boot -pflash ../firm
 
 
 
-## Using uftp
+## Using tftp
 
 ```shell
 qemu-system-arm -M vexpress-a9 -nographic -m 512M -kernel u-boot -pflash ../firmware.bin -net nic,model=lan9118 -net tap,ifname=tap0
